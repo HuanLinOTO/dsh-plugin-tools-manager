@@ -56,5 +56,6 @@ export function apply(ctx: Context, config: Config = {} as Config): void {
 
   ctx.effect(() => () => {
     disposePolicy()
+    registry.dispose()
   }, 'tools-manager: cleanup')
 }

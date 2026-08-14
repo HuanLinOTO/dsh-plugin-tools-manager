@@ -14,17 +14,23 @@ import { ToolRegistry, BASELINE_GROUP, UNKNOWN_GROUP } from '../src/registry.ts'
 
 /**
  * Minimal mock ctx: captures `on()` registrations so tests can fire events,
- * and returns a controllable `tools.schemas()`.
+ * and returns a controllable `tools.schemas()`. Also provides `tools.register`
+ * (wrapped by the registry) and `ctx.registry.values()` (for plugin enumeration).
  */
 interface MockCtx {
   on: (event: string, cb: (...args: unknown[]) => void) => () => void
-  tools: { schemas: () => unknown[] }
+  tools: {
+    schemas: () => unknown[]
+    register: (definition: unknown) => () => void
+  }
+  registry: { values: () => Iterable<{ name?: string; fibers: Array<{ name: string; state: number; uid: number | null }> }> }
   logger: { info: (...args: unknown[]) => void; debug: (...args: unknown[]) => void; warn: (...args: unknown[]) => void }
 }
 
-function makeMockCtx(initialSchemas: unknown[] = []): MockCtx & { fire: (event: string, ...args: unknown[]) => void } {
+function makeMockCtx(initialSchemas: unknown[] = [], runtimes: { name?: string; fibers: Array<{ name: string; state: number; uid: number | null }> }[] = []): MockCtx & { fire: (event: string, ...args: unknown[]) => void } {
   const listeners = new Map<string, Array<(...args: unknown[]) => void>>()
   const schemas = [...initialSchemas]
+  const registeredTools: string[] = []
   return {
     on: (event: string, cb: (...args: unknown[]) => void) => {
       const list = listeners.get(event) ?? []
@@ -38,7 +44,15 @@ function makeMockCtx(initialSchemas: unknown[] = []): MockCtx & { fire: (event: 
         }
       }
     },
-    tools: { schemas: () => [...schemas] },
+    tools: {
+      schemas: () => [...schemas],
+      register: vi.fn((def: unknown) => {
+        const d = def as { name?: string }
+        if (d?.name) registeredTools.push(d.name)
+        return () => {}
+      }),
+    },
+    registry: { values: () => runtimes },
     logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
     fire: (event: string, ...args: unknown[]) => {
       const list = listeners.get(event) ?? []
@@ -126,7 +140,9 @@ describe('ToolRegistry attribution on tools/change', () => {
 
     const tree = reg.getTree()
     const myGroup = tree.find(g => g.name === 'my-plugin')
-    expect(myGroup).toBeUndefined() // empty group deleted
+    // Empty groups are now retained (they may represent loaded plugins).
+    expect(myGroup).toBeDefined()
+    expect(myGroup!.tools).toEqual([])
     const baseGroup = tree.find(g => g.name === BASELINE_GROUP)
     expect(baseGroup!.tools.map(t => t.name)).toEqual(['baseline_tool'])
   })
