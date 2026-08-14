@@ -18,14 +18,22 @@
  *    pending-stack top is the best attribution candidate for any tool
  *    registered during that window.
  *
- * 2. **Wrap `ctx.tools.register`** — intercepts every registration call to
- *    capture the tool name + current pending-plugin attribution at the exact
- *    moment of registration, rather than inferring it later from a
- *    `tools/change` diff. This is more precise for concurrent loads.
+ * 2. **`tools/change` diff** — on every registry mutation, the registry
+ *    diffs `ctx.tools.schemas()` against its last snapshot; new tools are
+ *    attributed to the current pending-stack top (or {@link UNKNOWN_GROUP}
+ *    when no plugin is pending).
  *
  * 3. **`ctx.registry.values()`** — enumerates all loaded plugin runtimes
  *    (name + fibers), so we can list known plugin names in the tree even
  *    when we cannot attribute specific tools to them.
+ *
+ * `ctx.tools.register` is deliberately NOT wrapped: the Cordis traceable
+ * proxy rebinds `this.ctx` to each caller's context on every property
+ * access, which is how `scopeOf(this.ctx)` routes a registration to the
+ * correct scope layer. Monkey-patching the method (e.g. `.bind(proxy)`)
+ * pins `this.ctx` to this plugin's unscoped context, collapsing every
+ * scoped registration onto the global layer and producing "already
+ * registered" collisions when agent presets mount their tool rows.
  *
  * ## Known limitations
  *
@@ -75,12 +83,6 @@ interface FiberLike {
   readonly uid: number | null
 }
 
-/** A minimal ToolRuntime shape for wrapping register(). */
-interface ToolRuntimeLike {
-  register(definition: unknown): () => void
-  schemas(): ToolSchemaEntry[]
-}
-
 /** A minimal Plugin.Runtime shape from ctx.registry. */
 interface PluginRuntimeLike {
   name?: string
@@ -104,10 +106,9 @@ const STATE_DISPOSED = 4
 /**
  * The tool-to-plugin attribution registry.
  *
- * Construction is an effect: it wraps `ctx.tools.register`, registers
- * `internal/plugin`, `internal/status`, and `tools/change` listeners on the
- * supplied context. All listeners are fibre-scoped effects and auto-clean
- * on unload.
+ * Construction is an effect: it registers `internal/plugin`,
+ * `internal/status`, and `tools/change` listeners on the supplied context.
+ * All listeners are fibre-scoped effects and auto-clean on unload.
  */
 export class ToolRegistry {
   private readonly ctx: Context
@@ -119,55 +120,15 @@ export class ToolRegistry {
   private lastSnapshot = new Map<string, ToolEntry>()
   /** Stack of plugin names whose fibres are still loading (not yet ACTIVE/FAILED/DISPOSED). */
   private pendingPlugins: string[] = []
-  /** Original register method, restored on dispose. */
-  private originalRegister: ((definition: unknown) => () => void) | undefined
-  /** Dispose callback for the register wrapper. */
-  private restoreRegister: (() => void) | undefined
 
   constructor(ctx: Context) {
     this.ctx = ctx
 
     this.snapshotBaseline()
-    this.wrapRegister()
 
     ctx.on('internal/plugin', (fiber: Fiber) => this.onPluginEvent(fiber as unknown as FiberLike))
     ctx.on('internal/status', (fiber: Fiber) => this.onStatusEvent(fiber as unknown as FiberLike))
     ctx.on('tools/change', () => this.reconcile())
-  }
-
-  /**
-   * Wrap `ctx.tools.register` to capture attribution at registration time.
-   *
-   * When a plugin calls `ctx.tools.register(def)`, the wrapped method checks
-   * the pending-stack top (the plugin currently in its `apply()`) and records
-   * the tool name → plugin name mapping immediately. This is more precise
-   * than the `tools/change` diff for concurrent loads, and catches tools
-   * that are registered and then quickly unregistered before `tools/change`
-   * fires.
-   */
-  private wrapRegister(): void {
-    const tools = this.ctx.tools as unknown as ToolRuntimeLike
-    if (typeof tools.register !== 'function') return
-    this.originalRegister = tools.register.bind(tools)
-
-    const self = this
-    const wrapped = function (definition: unknown): () => void {
-      // Capture attribution at the exact moment of registration.
-      const def = definition as { name?: string } | undefined
-      const toolName = def?.name
-      if (typeof toolName === 'string') {
-        const owner = self.currentLoadingPlugin() ?? UNKNOWN_GROUP
-        self.recordAttribution(toolName, owner)
-      }
-      return self.originalRegister!(definition)
-    }
-
-    tools.register = wrapped as typeof tools.register
-    this.restoreRegister = () => {
-      if (self.originalRegister !== undefined) {
-        tools.register = self.originalRegister
-      }
-    }
   }
 
   /**
@@ -179,25 +140,6 @@ export class ToolRegistry {
       ? this.pendingPlugins[this.pendingPlugins.length - 1]
       : undefined
   }
-
-  /**
-   * Record a tool name → plugin name attribution (called from the wrapped
-   * register). Overwrites any previous attribution for this tool.
-   */
-  private recordAttribution(toolName: string, owner: string): void {
-    const prevOwner = this.toolToPlugin.get(toolName)
-    if (prevOwner !== undefined && prevOwner !== owner) {
-      this.removeToolFromGroup(toolName, prevOwner)
-    }
-    this.toolToPlugin.set(toolName, owner)
-    // Don't push to byPlugin here — the tools/change reconcile will add the
-    // entry when it appears in schemas(). We just record the attribution
-    // so reconcile knows where to put it.
-    this.pendingAttribution = this.pendingAttribution.set(toolName, owner)
-  }
-
-  /** Tool names whose attribution was captured by the register wrapper, awaiting reconcile. */
-  private pendingAttribution = new Map<string, string>()
 
   /**
    * Take the initial schemas() snapshot and attribute every visible tool to
@@ -336,10 +278,9 @@ export class ToolRegistry {
 
   /** Attribute a newly registered tool using pending attribution or pending-stack top. */
   private attributeNew(name: string, entry: ToolEntry): void {
-    // Prefer the attribution captured by the register wrapper (most precise).
-    const pendingOwner = this.pendingAttribution.get(name)
-    const owner: string = pendingOwner ?? this.currentLoadingPlugin() ?? UNKNOWN_GROUP
-    this.pendingAttribution.delete(name)
+    // Attribute to the plugin currently in its apply() (pending-stack top),
+    // or UNKNOWN_GROUP when no plugin is pending.
+    const owner: string = this.currentLoadingPlugin() ?? UNKNOWN_GROUP
 
     // If the tool was previously attributed (e.g. re-registered after a
     // dispose/reload), remove it from its old group first.
@@ -377,7 +318,6 @@ export class ToolRegistry {
     if (owner === undefined) return
     this.removeToolFromGroup(name, owner)
     this.toolToPlugin.delete(name)
-    this.pendingAttribution.delete(name)
   }
 
   /** Remove a tool from one specific plugin group (helper). */
@@ -417,8 +357,12 @@ export class ToolRegistry {
     return disabled.has(name)
   }
 
-  /** Restore the original register method and clean up listeners. */
+  /**
+   * No-op disposal hook. All listeners are registered through `ctx.on()`
+   * (fibre-scoped effects) and auto-clean on unload; there is no manually
+   * installed wrapper to restore.
+   */
   dispose(): void {
-    this.restoreRegister?.()
+    // intentionally empty — listeners are fibre-scoped effects.
   }
 }

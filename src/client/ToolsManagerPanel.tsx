@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { Button, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronRightOutline14, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   buildPrefixTree,
   collectLeafNames,
@@ -63,7 +63,7 @@ const introStyle: CSSProperties = {
   margin: 0, fontSize: 14, lineHeight: '22px', color: 'var(--dsw-alias-label-tertiary)',
 }
 const treeStyle: CSSProperties = {
-  margin: '8px 0 0', display: 'flex', flexDirection: 'column', gap: 2,
+  margin: '8px 0 0', display: 'flex', flexDirection: 'column', gap: 1,
 }
 const errorStyle: CSSProperties = {
   margin: 0, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-state-error-primary)',
@@ -77,12 +77,17 @@ const metaStyle: CSSProperties = {
 }
 
 /* ---- Node styles ---- */
-/** One internal node row: clickable header + collapsible children. */
-const nodeHeaderStyle: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '6px 8px', cursor: 'pointer', borderRadius: 6,
-  userSelect: 'none',
+const INDENT = 20 // px per depth level
+
+function nodeHeaderStyle(depth: number): CSSProperties {
+  return {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '5px 8px', cursor: 'pointer', borderRadius: 6,
+    userSelect: 'none',
+    marginLeft: depth * INDENT,
+  }
 }
+const nodeHeaderClass = 'tm-node-header'
 const nodeLabelStyle: CSSProperties = {
   fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)',
   fontFamily: 'ui-monospace, monospace',
@@ -90,18 +95,16 @@ const nodeLabelStyle: CSSProperties = {
 const nodeActionsStyle: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
 }
-const childrenStyle = (depth: number): CSSProperties => ({
-  marginLeft: depth === 0 ? 0 : 16,
-  borderLeft: depth === 0 ? 'none' : '1px solid var(--dsw-alias-border-l1)',
-  paddingLeft: depth === 0 ? 0 : 4,
-  display: 'flex', flexDirection: 'column', gap: 1,
-})
 
 /* ---- Leaf styles ---- */
-const leafRowStyle: CSSProperties = {
-  display: 'flex', alignItems: 'flex-start', gap: 8,
-  padding: '6px 8px', borderRadius: 6,
+function leafRowStyle(depth: number): CSSProperties {
+  return {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    padding: '5px 8px', borderRadius: 6,
+    marginLeft: depth * INDENT,
+  }
 }
+const leafRowClass = 'tm-leaf-row'
 const leafInfoStyle: CSSProperties = {
   flex: 1, minWidth: 0,
 }
@@ -122,17 +125,13 @@ const leafToggleStyle: CSSProperties = {
   flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
 }
 
-/** Chevron character — rotates when open. */
+/** Chevron icon — rotates 90° when open. Uses the official dsh icon primitive. */
 function Chevron({ open }: { open: boolean }): ReactNode {
   return (
-    <span style={{
-      display: 'inline-block',
-      transition: 'transform 0.15s ease',
-      transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-      fontSize: 10, lineHeight: 1,
-      color: 'var(--dsw-alias-label-tertiary)',
-      width: 12, textAlign: 'center',
-    }}>▶</span>
+    <IconChevronRightOutline14
+      size={14}
+      className={open ? 'chevron-open' : 'chevron-closed'}
+    />
   )
 }
 
@@ -274,6 +273,15 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
               ))}
             </div>
           )}
+
+      {/* Chevron rotation + node hover via scoped <style> — inline styles can't
+          do :hover or class-based transforms without a stylesheet. */}
+      <style>{`
+        .chevron-closed { transition: transform 0.15s ease; transform: rotate(0deg); }
+        .chevron-open { transition: transform 0.15s ease; transform: rotate(90deg); }
+        .tm-node-header:hover { background: var(--dsw-alias-bg-module-platform, rgba(0,0,0,0.04)); }
+        .tm-leaf-row:hover { background: var(--dsw-alias-bg-module-platform, rgba(0,0,0,0.04)); }
+      `}</style>
     </section>
   )
 }
@@ -292,7 +300,7 @@ function TreeEntry(props: {
   if (node.kind === 'leaf') {
     const pending = pendingTools.has(node.name)
     return (
-      <div style={leafRowStyle}>
+      <div style={leafRowStyle(depth)} className={leafRowClass}>
         <div style={leafInfoStyle}>
           <div style={leafNameStyle}>{node.name}</div>
           {node.description ? <div style={leafDescStyle}>{node.description}</div> : null}
@@ -350,10 +358,9 @@ function PrefixNodeEntry(props: {
   return (
     <div>
       <div
-        style={nodeHeaderStyle}
+        style={nodeHeaderStyle(depth)}
+        className={nodeHeaderClass}
         onClick={() => setOpen(!open)}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dsw-alias-bg-module-platform, rgba(0,0,0,0.04))' }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
       >
         <Chevron open={open} />
         <span style={nodeLabelStyle}>{node.label}</span>
@@ -368,7 +375,7 @@ function PrefixNodeEntry(props: {
         </div>
       </div>
       {open && (
-        <div style={childrenStyle(depth)}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {node.children.map(child => (
             <TreeEntry
               key={child.kind === 'node' ? child.prefix : child.name}

@@ -3,6 +3,9 @@ node_modules/
 *.tgz
 coverage/
 .vitest-cache/
+# Type declarations are not part of the prebuilt lib/ strategy (no tsc -d in
+# the build script); keep them out of the repo to match the tracked .js set.
+lib/*.d.ts
 # Local dev-only pnpm files: profile provides its own on github: install.
 # Committing these without active maintenance breaks github: install resolution.
 pnpm-lock.yaml
