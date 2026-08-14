@@ -1,0 +1,104 @@
+# 字段定义：DSH Tools 管理插件调研
+# detail_level: 极简（一句话）→ 简要（要点）→ 详细（含示例/边界）
+# uncertain: deep 阶段需验证的字段（保留待填充）
+
+fields:
+  - category: 基本信息
+    fields:
+      - name: id
+        description: 调研对象唯一标识（snake_case）
+        detail_level: 极简
+      - name: name
+        description: 名称（服务/事件/插件名）
+        detail_level: 极简
+      - name: package
+        description: 所在包/仓库（如 @deepseek-ai/dsh-tools）
+        detail_level: 极简
+      - name: type
+        description: 类型：service / event / seam / ui / doc / plugin
+        detail_level: 极简
+
+  - category: 能力缝
+    fields:
+      - name: mechanism
+        description: 底层机制（register/restrict/guard/presentAs/事件名等）
+        detail_level: 简要
+      - name: scope
+        description: 作用域：global（plain ctx）/ agent（scoped）/ both；含作用域链语义
+        detail_level: 简要
+      - name: ordering
+        description: 排序/组合语义：waterfall（按序，next() 委托）/ emit（广播）/ 单调（不可撤销）
+        detail_level: 简要
+      - name: signature
+        description: 事件签名或方法签名（参数/返回）
+        detail_level: 详细
+
+  - category: 管理语义
+    fields:
+      - name: actions
+        description: 该缝支持的管理动作：浏览 / 启停（隐藏|拒执行）/ 审批 / 审计
+        detail_level: 简要
+      - name: reversibility
+        description: 动作是否可逆（disposer/恢复路径）
+        detail_level: 简要
+      - name: persistence
+        description: 状态持久化方式（ctx.settings 命名空间 / localStorage / 会话事件 / 无）
+        detail_level: 简要
+      - name: accuracy_boundary
+        description: 精度边界与失效场景（如归因在插件运行期动态注册时的偏移）
+        detail_level: 详细
+        uncertain: true
+
+  - category: 数据与审计
+    fields:
+      - name: payload
+        description: 事件/接口携带的数据（无 payload / 快照 / 结构化）
+        detail_level: 简要
+      - name: durable
+        description: 是否持久化（durable / log-only / 执行期局部）
+        detail_level: 极简
+      - name: audit_value
+        description: 审计价值（能否支撑统计、追溯、归因）
+        detail_level: 简要
+
+  - category: UI 集成
+    fields:
+      - name: slot
+        description: 挂载点（settings.plugin.item / sidebar tab / composer dock / 无）
+        detail_level: 极简
+      - name: client_channel
+        description: host↔client 数据通道（webServer 前缀路由 / typertRemote / SSE）
+        detail_level: 简要
+      - name: presentation
+        description: 展示形式（tree / 开关列表 / 卡片 / 表格）
+        detail_level: 简要
+
+  - category: 工程规范
+    fields:
+      - name: bundle_compliance
+        description: bundle 合规要点（dsh.bundle.patch / cordis.patch.yml / peerDeps / 零源码 patch）
+        detail_level: 简要
+      - name: tests
+        description: 测试分层（Unit / 真实组合 preflight / snapshot）
+        detail_level: 简要
+      - name: release_path
+        description: 发布路径（预构建 lib/ 入库 / link: 开发 / private 仓库）
+        detail_level: 简要
+
+  - category: 竞品对比
+    fields:
+      - name: analog
+        description: 同类机制/产品（OpenAI function calling 治理、Claude 工具权限、LangChain、MCP）
+        detail_level: 极简
+      - name: difference
+        description: 与 DSH 机制的差异点
+        detail_level: 简要
+      - name: borrowable
+        description: 可借鉴设计（最小调研，不追求广度）
+        detail_level: 简要
+        uncertain: true
+
+uncertain:
+  - accuracy_boundary        # 来源归因在动态注册/并发加载时的精度边界（deep 验证）
+  - borrowable               # 竞品可借鉴设计（deep 阶段可选填充）
+  - global_disable_coverage  # 全局启停对 run_code SDK 子调用的覆盖验证（deep 验证）
