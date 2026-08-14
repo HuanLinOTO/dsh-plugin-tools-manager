@@ -20,5 +20,6 @@
       "@deepseek-ai/dsh-host-webserver": ["C:/Users/Administrator/.dsh/source/current/packages/host/webserver/lib/types/index.d.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/client", "tests"]
 }

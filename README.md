@@ -4,7 +4,7 @@ DSH 插件：以 tree 形式列出「插件 → 工具」，并支持全局启�
 
 - **Tree 列出工具**：按来源插件分组，展示每个插件注册的全部工具（name / description）。
 - **全局启停**：对任意工具一键禁用/启用，跨会话持久化，立即生效（模型不可见 + 执行被拒，两层一致）。
-- **UI 入口**：设置页「插件配置」分区卡片（`settings.plugin.item` slot）。
+- **UI 入口**：设置页独立「工具管理」Tab（`settings.section` slot，与「MCP」Tab 同级）。
 
 ## 架构
 
@@ -63,11 +63,9 @@ src/
 ├── settings.ts           # installToolsManagerSettings: 注册 namespace，返回 bridge
 ├── gateway.ts            # registerHttpGateway: /tools-manager/api 前缀路由（list/set）
 └── client/
-    ├── index.ts          # Client 入口：settings.plugin.item slot 注册
-    ├── store.ts          # ToolsManagerCardController: fetch 调用 + SnapshotStore
-    ├── ToolsManagerCard.tsx  # 配置卡片组件（tree + 开关）
-    ├── ToolsManagerCard.module.css
-    └── locales.ts        # i18n (zh + en)
+    ├── index.ts              # Client 入口：settings.section slot 注册独立 Tab
+    ├── ToolsManagerPanel.tsx # 面板组件（tree + 开关，inline styles 对齐 mcp-manager）
+    └── locales.ts            # i18n (zh + en)
 ```
 
 ## 运行
