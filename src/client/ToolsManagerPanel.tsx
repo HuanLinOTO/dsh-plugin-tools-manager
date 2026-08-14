@@ -8,15 +8,11 @@
  *
  * Reads/writes through the `/tools-manager/api/list|set` HTTP route.
  *
- * UI design language aligns with dsh-mcp-manager's Panel (inline styles,
- * --dsw-alias-* CSS variables, Button/Pill/DisclosureRow from
- * dsh-client-ui-primitives).
- *
  * @module dsh-tools-manager/client/ToolsManagerPanel
  */
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { Button, DisclosureRow, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   buildPrefixTree,
   collectLeafNames,
@@ -54,9 +50,9 @@ export interface ToolsManagerPanelProps {
   // settings.section slot delivers no inject face — the panel is self-contained.
 }
 
-/* ---- Design language (aligned with dsh-mcp-manager / official settings pages) ---- */
+/* ---- Design language ---- */
 const sectionStyle: CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720,
+  display: 'flex', flexDirection: 'column', gap: 12,
   color: 'var(--dsw-alias-label-primary)',
 }
 const titleStyle: CSSProperties = {
@@ -66,8 +62,8 @@ const titleStyle: CSSProperties = {
 const introStyle: CSSProperties = {
   margin: 0, fontSize: 14, lineHeight: '22px', color: 'var(--dsw-alias-label-tertiary)',
 }
-const treeContainerStyle: CSSProperties = {
-  margin: '12px 0 0', display: 'flex', flexDirection: 'column', gap: 4,
+const treeStyle: CSSProperties = {
+  margin: '8px 0 0', display: 'flex', flexDirection: 'column', gap: 2,
 }
 const errorStyle: CSSProperties = {
   margin: 0, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-state-error-primary)',
@@ -79,9 +75,32 @@ const metaStyle: CSSProperties = {
   fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)',
   fontFamily: 'ui-monospace, monospace',
 }
+
+/* ---- Node styles ---- */
+/** One internal node row: clickable header + collapsible children. */
+const nodeHeaderStyle: CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  padding: '6px 8px', cursor: 'pointer', borderRadius: 6,
+  userSelect: 'none',
+}
+const nodeLabelStyle: CSSProperties = {
+  fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)',
+  fontFamily: 'ui-monospace, monospace',
+}
+const nodeActionsStyle: CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
+}
+const childrenStyle = (depth: number): CSSProperties => ({
+  marginLeft: depth === 0 ? 0 : 16,
+  borderLeft: depth === 0 ? 'none' : '1px solid var(--dsw-alias-border-l1)',
+  paddingLeft: depth === 0 ? 0 : 4,
+  display: 'flex', flexDirection: 'column', gap: 1,
+})
+
+/* ---- Leaf styles ---- */
 const leafRowStyle: CSSProperties = {
-  display: 'flex', alignItems: 'flex-start', gap: 12,
-  padding: '4px 0 4px 28px', // indent under the disclosure chevron
+  display: 'flex', alignItems: 'flex-start', gap: 8,
+  padding: '6px 8px', borderRadius: 6,
 }
 const leafInfoStyle: CSSProperties = {
   flex: 1, minWidth: 0,
@@ -89,16 +108,32 @@ const leafInfoStyle: CSSProperties = {
 const leafNameStyle: CSSProperties = {
   fontSize: 13, fontWeight: 500, color: 'var(--dsw-alias-label-primary)',
   fontFamily: 'ui-monospace, monospace',
+  wordBreak: 'break-all',
 }
 const leafDescStyle: CSSProperties = {
   fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)',
   marginTop: 2, wordBreak: 'break-word',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
 }
-const toggleStyle: CSSProperties = {
+const leafToggleStyle: CSSProperties = {
   flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
 }
-const nodeActionsStyle: CSSProperties = {
-  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
+
+/** Chevron character — rotates when open. */
+function Chevron({ open }: { open: boolean }): ReactNode {
+  return (
+    <span style={{
+      display: 'inline-block',
+      transition: 'transform 0.15s ease',
+      transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+      fontSize: 10, lineHeight: 1,
+      color: 'var(--dsw-alias-label-tertiary)',
+      width: 12, textAlign: 'center',
+    }}>▶</span>
+  )
 }
 
 /** Settings tab panel body. */
@@ -107,7 +142,6 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
   const [error, setError] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  /** Set of tool names currently being toggled (for disabling buttons during batch ops). */
   const [pendingTools, setPendingTools] = useState<Set<string>>(new Set())
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -158,21 +192,16 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
     }
   }, [])
 
-  /**
-   * Batch-toggle all descendant tools under a prefix node.
-   * If any descendant is enabled, disable all; if all are disabled, enable all.
-   */
+  /** Batch-toggle all descendant tools under a prefix node. */
   const toggleNode = useCallback(async (node: TreeNode): Promise<void> => {
     const names = collectLeafNames(node)
     if (names.length === 0) return
-    // Find current state of these tools from the plugins state.
     const toolMap = new Map<string, boolean>()
     for (const g of plugins) {
       for (const t of g.tools) toolMap.set(t.name, t.disabled)
     }
     const anyEnabled = names.some(n => toolMap.get(n) !== true)
-    const targetDisabled = anyEnabled // if any enabled → disable all
-    // Only toggle tools that aren't already in the target state.
+    const targetDisabled = anyEnabled
     const toToggle = names.filter(n => toolMap.get(n) !== targetDisabled)
     if (toToggle.length === 0) return
 
@@ -180,8 +209,6 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
     setPendingTools(prev => { const next = new Set(prev); for (const n of toToggle) next.add(n); return next })
     setError(undefined)
     try {
-      // Toggle sequentially (the API handles one tool at a time).
-      // The last response carries the full refreshed tree.
       let lastBody: ApiEnvelope | undefined
       for (const name of toToggle) {
         const res = await fetch('/tools-manager/api/set', {
@@ -206,7 +233,6 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
     }
   }, [plugins])
 
-  // Build a flat tool→group lookup for the tree, then build the prefix tree.
   const allTools = useMemo(() => {
     const tools: ToolRow[] = []
     for (const g of plugins) tools.push(...g.tools)
@@ -214,7 +240,6 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
   }, [plugins])
 
   const tree = useMemo(() => buildPrefixTree(allTools), [allTools])
-
   const totalTools = allTools.length
   const disabledCount = allTools.filter(t => t.disabled).length
 
@@ -222,7 +247,7 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
     <section style={sectionStyle}>
       <h2 style={titleStyle}>工具管理</h2>
       <p style={introStyle}>
-        按工具名前缀分组的可折叠树。内部节点显示聚合状态并支持批量启停子工具。禁用的工具对模型不可见且执行被拒，跨会话持久化。
+        按工具名前缀分组的可折叠树。点击节点展开/折叠，内部节点支持批量启停子工具。禁用的工具对模型不可见且执行被拒，跨会话持久化。
       </p>
       <p style={metaStyle}>
         共 {plugins.length} 个插件 · {totalTools} 个工具 · {disabledCount} 个已禁用
@@ -235,7 +260,7 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
         : totalTools === 0
           ? <p style={emptyStyle}>当前没有已注册的工具。</p>
           : (
-            <div style={treeContainerStyle}>
+            <div style={treeStyle}>
               {tree.map(node => (
                 <TreeEntry
                   key={node.kind === 'node' ? node.prefix : node.name}
@@ -272,7 +297,7 @@ function TreeEntry(props: {
           <div style={leafNameStyle}>{node.name}</div>
           {node.description ? <div style={leafDescStyle}>{node.description}</div> : null}
         </div>
-        <div style={toggleStyle}>
+        <div style={leafToggleStyle}>
           {node.disabled
             ? <Pill>已禁用</Pill>
             : <Pill active>已启用</Pill>}
@@ -287,20 +312,10 @@ function TreeEntry(props: {
     )
   }
 
-  // Internal node — a collapsible prefix group.
-  const counts = countLeaves(node)
-  const allDisabled = counts.disabled === counts.total
-  const anyEnabled = counts.disabled < counts.total
-  const nodePending = collectLeafNames(node).some(n => pendingTools.has(n))
-
   return (
     <PrefixNodeEntry
       node={node}
       depth={depth}
-      counts={counts}
-      allDisabled={allDisabled}
-      anyEnabled={anyEnabled}
-      nodePending={nodePending}
       pendingTools={pendingTools}
       busy={busy}
       onToggleTool={onToggleTool}
@@ -311,66 +326,62 @@ function TreeEntry(props: {
 
 /** A collapsible internal node with batch toggle. */
 function PrefixNodeEntry(props: {
-  node: PrefixNodeLike
+  node: TreeNode
   depth: number
-  counts: { total: number; disabled: number }
-  allDisabled: boolean
-  anyEnabled: boolean
-  nodePending: boolean
   pendingTools: Set<string>
   busy: boolean
   onToggleTool: (toolName: string, disabled: boolean) => void
   onToggleNode: (node: TreeNode) => void
 }): ReactNode {
-  const { node, depth, counts, allDisabled, anyEnabled, nodePending, pendingTools, busy, onToggleTool, onToggleNode } = props
-  const [open, setOpen] = useState(depth < 1) // top-level open by default
+  const { node, depth, pendingTools, busy, onToggleTool, onToggleNode } = props
+  const [open, setOpen] = useState(depth < 1)
+
+  if (node.kind !== 'node') return null
+
+  const counts = countLeaves(node)
+  const allDisabled = counts.disabled === counts.total
+  const anyEnabled = counts.disabled < counts.total
+  const nodePending = collectLeafNames(node).some(n => pendingTools.has(n))
 
   const statusPill = allDisabled
     ? <Pill>全部已禁用</Pill>
-    : anyEnabled
-      ? <Pill active>{counts.total - counts.disabled}/{counts.total} 已启用</Pill>
-      : <Pill>{counts.total} 个工具</Pill>
+    : <Pill active>{counts.total - counts.disabled}/{counts.total}</Pill>
 
   return (
-    <DisclosureRow
-      icon={<span style={{ fontSize: 14, fontFamily: 'ui-monospace, monospace', color: 'var(--dsw-alias-label-secondary)' }}>{node.label}</span>}
-      title=""
-      open={open}
-      expandable={true}
-      onToggle={() => setOpen(!open)}
-      expandOnRowClick={true}
-      collapsedContent={statusPill}
-      keepContentWhenOpen={true}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 4 }}>
+    <div>
+      <div
+        style={nodeHeaderStyle}
+        onClick={() => setOpen(!open)}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dsw-alias-bg-module-platform, rgba(0,0,0,0.04))' }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+      >
+        <Chevron open={open} />
+        <span style={nodeLabelStyle}>{node.label}</span>
         <div style={nodeActionsStyle}>
           {statusPill}
           <Button
-            onClick={() => onToggleNode(node as unknown as TreeNode)}
+            onClick={(e: React.MouseEvent) => { e.stopPropagation(); onToggleNode(node) }}
             disabled={busy && nodePending}
           >
             {anyEnabled ? '全部禁用' : '全部启用'}
           </Button>
         </div>
-        {node.children.map(child => (
-          <TreeEntry
-            key={child.kind === 'node' ? child.prefix : child.name}
-            node={child}
-            depth={depth + 1}
-            pendingTools={pendingTools}
-            busy={busy}
-            onToggleTool={onToggleTool}
-            onToggleNode={onToggleNode}
-          />
-        ))}
       </div>
-    </DisclosureRow>
+      {open && (
+        <div style={childrenStyle(depth)}>
+          {node.children.map(child => (
+            <TreeEntry
+              key={child.kind === 'node' ? child.prefix : child.name}
+              node={child}
+              depth={depth + 1}
+              pendingTools={pendingTools}
+              busy={busy}
+              onToggleTool={onToggleTool}
+              onToggleNode={onToggleNode}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
-}
-
-/** Local alias to avoid importing the full PrefixNode type from prefixTree (which uses `as unknown as`). */
-interface PrefixNodeLike {
-  readonly prefix: string
-  readonly label: string
-  readonly children: TreeNode[]
 }
