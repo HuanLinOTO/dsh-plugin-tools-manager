@@ -15,8 +15,13 @@
  * @module @huanlin/dsh-plugin-tools-manager/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { Context } from '@deepseek-ai/cordis'
+// Type-only: pulls the ctx.slots Context merge (SlotRegistry) — the runtime
+// service lives in ui-renderer since the client-runtime split (v0.1.2-alpha.1).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Type-only: pulls the SlotMap merge declaring 'settings.section' (the slot
+// this plugin registers into).
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { ToolsManagerPanel } from './ToolsManagerPanel.tsx'
 
 export type { ToolsManagerPanelProps } from './ToolsManagerPanel.tsx'
@@ -30,7 +35,7 @@ export const inject = ['slots']
  * Register the tools-manager panel as a top-level settings tab.
  * @param ctx - client root context.
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   ctx.slots.inject('settings.section', () =>
     ctx.slots.register({
       name: 'settings.section',
