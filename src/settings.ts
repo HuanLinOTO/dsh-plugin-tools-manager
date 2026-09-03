@@ -16,12 +16,12 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsNamespace, type SettingsScope } from '@deepseek-ai/dsh-settings'
+import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { Config, type Config as ConfigType, type ResolvedConfig } from './config.js'
 import { resolveConfig } from './config.js'
 
 /** Settings namespace under which the disabled-tool list persists. */
-export const SETTINGS_NAMESPACE = settingsNamespace('tools-manager')
+export const SETTINGS_NAMESPACE = 'tools-manager'
 
 /**
  * Mirror of the dsh-settings internal `isUnloading` guard. The cordis const
