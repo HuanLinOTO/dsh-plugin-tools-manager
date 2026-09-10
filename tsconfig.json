@@ -13,11 +13,13 @@
     "rewriteRelativeImportExtensions": true,
     "types": ["node"],
     "paths": {
-      "@deepseek-ai/cordis": ["C:/Users/Administrator/.dsh/source/current/vendor/cordis/lib/types/index.d.ts"],
-      "@deepseek-ai/cosmokit": ["C:/Users/Administrator/.dsh/source/current/vendor/cosmokit/lib/types/index.d.ts"],
-      "@deepseek-ai/schemastery": ["C:/Users/Administrator/.dsh/source/current/vendor/schemastery/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-system-prompt": ["C:/Users/Administrator/.dsh/source/current/packages/core/system-prompt/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-host-webserver": ["C:/Users/Administrator/.dsh/source/current/packages/host/webserver/lib/types/index.d.ts"]
+      "@deepseek-ai/cordis": ["D:/Projects/deepseek-harness/dsh/vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/cosmokit": ["D:/Projects/deepseek-harness/dsh/vendor/cosmokit/lib/types/index.d.ts"],
+      "@deepseek-ai/schemastery": ["D:/Projects/deepseek-harness/dsh/vendor/schemastery/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-system-prompt": ["D:/Projects/deepseek-harness/dsh/packages/core/system-prompt/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-host-webserver": ["D:/Projects/deepseek-harness/dsh/packages/host/webserver/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-settings": ["D:/Projects/deepseek-harness/dsh/packages/settings/settings/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-tools": ["D:/Projects/deepseek-harness/dsh/packages/core/tools/lib/types/index.d.ts"]
     }
   },
   "include": ["src"],
