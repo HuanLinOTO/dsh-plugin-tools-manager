@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Tools Manager",
+    "description": "Lists every registered tool grouped by source plugin (tree) and supports globally disabling individual tools — hidden from the model and refused at execution, persisted across sessions; toggling happens on this plugin's row config card on the Plugins page."
+  }
+}

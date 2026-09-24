@@ -30,7 +30,6 @@ function registryOf(groups: PluginGroup[]): ToolRegistry {
 function bridgeOf(disabled: string[]): ToolsManagerSettingsBridge {
   return {
     source: () => ({ disabled }),
-    onChange: () => {},
   }
 }
 

@@ -1,11 +1,11 @@
 {
   "name": "@huanlin/dsh-plugin-tools-manager",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "publishConfig": {
     "access": "public"
   },
   "keywords": ["dsh-plugin"],
-  "description": "Lists every registered tool grouped by source plugin (tree) and supports globally disabling individual tools; settings card (via /tools-manager/api HTTP route) lets users toggle tools on/off.",
+  "description": "Lists every registered tool grouped by source plugin (tree) and supports globally disabling individual tools; Plugins-page row config card (via /tools-manager/api HTTP route) lets users toggle tools on/off.",
   "type": "module",
   "license": "AGPL-3.0",
   "main": "./lib/index.js",
@@ -18,10 +18,12 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/",
+    "locale/",
     "cordis.patch.yml"
   ],
   "dsh": {
@@ -31,7 +33,10 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-ui-primitives",
-        "@deepseek-ai/dsh-client-ui-slots"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
       ],
       "platform": "web"
     }
@@ -45,6 +50,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-client-ui-primitives": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-client-ui-settings": "^0.1.7-rc.1",
@@ -58,6 +64,7 @@
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": { "optional": true },
     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+    "@deepseek-ai/dsh-client-ui-plugin-manager": { "optional": true },
     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
     "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
     "@deepseek-ai/dsh-client-ui-settings": { "optional": true },

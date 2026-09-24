@@ -1,18 +1,27 @@
 /**
- * ToolsManagerPanel — the top-level settings tab panel for tool management.
+ * ToolsManagerPanel — this bundle row's configuration card on the Plugins
+ * page (`plugins.row.config`, keyed `<package name>#<row id>`).
  *
- * Renders tools as a **collapsible prefix tree** (built from tool names split
- * on `__` and `_`). Internal nodes show an aggregate enable/disable count and
- * act as a batch toggle for all descendant tools. Leaf nodes are the actual
- * tools with individual enable/disable buttons.
+ * `view: 'summary'` renders the one-liner the row's page shows as its
+ * description fallback; `view: 'page'` renders the tool tree. The page draws
+ * the title, icon, and crumb itself — this card draws only fields and copy.
  *
- * Reads/writes through the `/tools-manager/api/list|set` HTTP route.
+ * The tree renders tools as a **collapsible prefix tree** (built from tool
+ * names split on `__` and `_`). Internal nodes show an aggregate enable/
+ * disable count and act as a batch toggle for all descendant tools. Leaf
+ * nodes are the actual tools with individual enable/disable buttons.
+ *
+ * Reads/writes through the `/tools-manager/api/list|set` HTTP route. The
+ * bound `form` (present once the Host serves the entry's config) is the
+ * availability gate: without it the row is stopped and the card says so
+ * instead of drawing a tree whose writes cannot land.
  *
  * @module dsh-tools-manager/client/ToolsManagerPanel
  */
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Button, IconChevronRightOutlineMedium, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   buildPrefixTree,
   collectLeafNames,
@@ -45,18 +54,14 @@ interface ApiEnvelope {
   error?: { code?: string; message?: string }
 }
 
-/** Props the renderer binds for the panel. */
-export interface ToolsManagerPanelProps {
-  // settings.section slot delivers no inject face — the panel is self-contained.
-}
+/** Props the Plugins page binds: the requested view (`summary` one-liner or
+ * `page` form) and, for `page`, the Host-served entry form — undefined when
+ * the row is stopped and its config is not being served. */
+export type ToolsManagerPanelProps = PropsRuntime<'plugins.row.config'>
 
 /* ---- Design language ---- */
 const sectionStyle: CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 12,
-  color: 'var(--dsw-alias-label-primary)',
-}
-const titleStyle: CSSProperties = {
-  margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 500,
   color: 'var(--dsw-alias-label-primary)',
 }
 const introStyle: CSSProperties = {
@@ -135,8 +140,27 @@ function Chevron({ open }: { open: boolean }): ReactNode {
   )
 }
 
-/** Settings tab panel body. */
-export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
+/** The bundle row's configuration card: summary one-liner or tool tree page. */
+export function ToolsManagerPanel(props: ToolsManagerPanelProps): ReactNode {
+  // The row page draws the title/icon/crumb; `summary` is the one-liner it
+  // shows when the row carries no description of its own.
+  if (props.view === 'summary') {
+    return '按来源插件分组列出全部已注册工具，支持单个或按前缀批量启停；禁用的工具对模型不可见且执行被拒，跨会话持久化。'
+  }
+  // `page` without a served form: the row is stopped (or the Host is not
+  // serving its config), so the tree's writes cannot land — say so instead.
+  if (props.form === undefined) {
+    return (
+      <section style={sectionStyle}>
+        <p style={introStyle}>工具启停当前不可用：该行已停用，或 Host 暂未提供其配置。请在插件页启用本插件的行后重试。</p>
+      </section>
+    )
+  }
+  return <ToolTreeCard />
+}
+
+/** The interactive tool tree, rendered as the row configuration page body. */
+function ToolTreeCard(): ReactNode {
   const [plugins, setPlugins] = useState<PluginGroupRow[]>([])
   const [error, setError] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -244,7 +268,6 @@ export function ToolsManagerPanel(_props: ToolsManagerPanelProps): ReactNode {
 
   return (
     <section style={sectionStyle}>
-      <h2 style={titleStyle}>工具管理</h2>
       <p style={introStyle}>
         按工具名前缀分组的可折叠树。点击节点展开/折叠，内部节点支持批量启停子工具。禁用的工具对模型不可见且执行被拒，跨会话持久化。
       </p>

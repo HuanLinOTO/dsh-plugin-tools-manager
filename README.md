@@ -4,7 +4,7 @@ DSH 插件：以 tree 形式列出「插件 → 工具」，并支持全局启�
 
 - **Tree 列出工具**：按来源插件分组，展示每个插件注册的全部工具（name / description）。
 - **全局启停**：对任意工具一键禁用/启用，跨会话持久化，立即生效（模型不可见 + 执行被拒，两层一致）。
-- **UI 入口**：设置页独立「工具管理」Tab（`settings.section` slot，与「MCP」Tab 同级）。
+- **UI 入口**：插件页（Plugins）→ 本插件 bundle 行的「配置」入口（`plugins.row.config` keyed slot，key = `@huanlin/dsh-plugin-tools-manager#tools-manager`，行 id 与 `cordis.patch.yml` insert 行 `id` 逐字一致；0.1.7-alpha.1 起 `settings.plugin.item` 退役、`settings.section` 独立 Tab 不再使用）。
 
 ## 架构
 
@@ -31,9 +31,9 @@ DSH 插件：以 tree 形式列出「插件 → 工具」，并支持全局启�
 
 ### 持久化
 
-- `ctx.settings.register('tools-manager', Config)` → 存 `$DSH_HOME/settings.yaml`，跨会话生效。
+- `disabled` 列表持久化在 profile `cordis.patch.yml` 的 `tools-manager` entry Config 中（DSH 0.1.7 起；字段标 `.volatile()`，`settings.configure({ auto: false })` 声明插件自管配置页），跨会话生效。
 - `Config`：`{ disabled: string[] }`（Schemastery schema，默认 `[]`）。
-- 设置变更即时应用（guard/assemble 读同一份 `disabled` 状态，无需重启）。
+- 运行时编辑经 `settings.update('tools-manager', { disabled })` 提交，Loader 原地更新 volatile 引用，即时应用（guard/assemble 读同一份 `disabled` 状态，无需重启）。
 
 ### Host↔Client 通道
 
@@ -63,9 +63,10 @@ src/
 ├── settings.ts           # installToolsManagerSettings: 注册 namespace，返回 bridge
 ├── gateway.ts            # registerHttpGateway: /tools-manager/api 前缀路由（list/set）
 └── client/
-    ├── index.ts              # Client 入口：settings.section slot 注册独立 Tab
-    ├── ToolsManagerPanel.tsx # 面板组件（tree + 开关，inline styles 对齐 mcp-manager）
-    └── locales.ts            # i18n (zh + en)
+    ├── index.ts              # Client 入口：plugins.row.config keyed slot 注册行配置卡片
+    ├── row-config-key.ts     # key 派生（包名#行 id）与三 id 一致性注释
+    ├── ToolsManagerPanel.tsx # 行配置卡片（summary 一行简介 / page 工具树，inline styles）
+    └── prefixTree.ts         # 前缀树构建工具（`__`/`_` 分割）
 ```
 
 ## 运行
@@ -84,7 +85,7 @@ dsh plugin --profile web add "link:D:/Projects/deepseek-harness/dsh-tools-manage
 disabled: []    # 预置禁用的工具名列表（默认空）
 ```
 
-运行时通过设置页「插件配置」分区的卡片修改，持久化到 `$DSH_HOME/settings.yaml`。
+运行时通过插件页本插件行配置卡片修改（`plugins.row.config`，注册由 `configForms.whileServed` 门控：行停用/Host 不供配置时入口随之消失，`view:'page'` 且 form 缺失时卡片显示不可用提示），持久化到 profile `cordis.patch.yml` 的 `tools-manager` entry。
 
 ## 检查
 
