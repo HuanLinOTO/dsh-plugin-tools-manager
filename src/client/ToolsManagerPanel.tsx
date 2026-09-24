@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { Button, IconChevronRightOutline14, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronRightOutlineMedium, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   buildPrefixTree,
   collectLeafNames,
@@ -128,7 +128,7 @@ const leafToggleStyle: CSSProperties = {
 /** Chevron icon — rotates 90° when open. Uses the official dsh icon primitive. */
 function Chevron({ open }: { open: boolean }): ReactNode {
   return (
-    <IconChevronRightOutline14
+    <IconChevronRightOutlineMedium
       size={14}
       className={open ? 'chevron-open' : 'chevron-closed'}
     />

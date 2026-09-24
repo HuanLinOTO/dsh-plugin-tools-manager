@@ -1,90 +1,58 @@
 /**
- * settings.ts — host-side bridge between the `tools-manager` settings namespace
- * and the plugin's other halves (policy + gateway + registry).
+ * settings.ts — host-side bridge between the `tools-manager` entry Config and
+ * the plugin's other halves (policy + gateway + registry).
  *
- * The composition `Config` (cordis.patch.yml) is the first-boot seed; once the
- * `ctx.settings` service mounts, the user-editable layer takes over and the
- * disabled set tracks every committed change. Headless assemblies without a
- * settings provider fall back to the composition config (no persistence, no
- * live reload).
+ * Since DSH 0.1.7 (DSH-0.1.7-RC1-04) settings no longer live in a namespace
+ * registry: `ctx.settings.register` is gone. The plugin declares a Cordis
+ * `Config` (see `config.ts`, field `disabled` marked `.volatile()`) whose value
+ * persists per profile in `cordis.patch.yml` under the entry id
+ * (`tools-manager`). The Loader passes `apply` a live `Volatile<string[]>`
+ * reference, so `source()` reads `.get()` on every call and always serves the
+ * latest committed value — no in-process watcher or remount needed.
  *
- * The bridge mirrors `dsh-interpreters/src/settings.ts`: a `source()` thunk the
- * gateway and policy read in-process, plus an `onChange()` subscription the
- * host entry uses to rebuild the disabled set on every committed change.
+ * `configure({ auto: false })` opts the entry out of the schema-generated
+ * settings page: this plugin ships its own `settings.section` panel (client
+ * half) and manages its own presentation. Headless assemblies without a
+ * settings provider still load the plugin from the composition seed.
  *
  * @module dsh-tools-manager/settings
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { SettingsScope } from '@deepseek-ai/dsh-settings'
-import { Config, type Config as ConfigType, type ResolvedConfig } from './config.js'
-import { resolveConfig } from './config.js'
+// Type-only: pulls the `ctx.settings` Context merge (SettingsForms).
+import type {} from '@deepseek-ai/dsh-settings'
+import { type EntryConfig, type ResolvedConfig, resolveConfig } from './config.js'
 
-/** Settings namespace under which the disabled-tool list persists. */
+/** Profile entry id under which the disabled-tool list persists (cordis.patch.yml). */
 export const SETTINGS_NAMESPACE = 'tools-manager'
-
-/**
- * Mirror of the dsh-settings internal `isUnloading` guard. The cordis const
- * enum for fiber state is erased at compile time, so the literal states are
- * matched numerically: 4 = DISPOSED, 5 = UNLOADING.
- */
-function isUnloading(ctx: Context): boolean {
-  const state = (ctx as unknown as { fiber?: { state?: number } }).fiber?.state
-  return state === 4 || state === 5
-}
 
 /** Read face the gateway and policy consume. */
 export interface ToolsManagerSettingsBridge {
-  /** The current resolved config (composition seed while settings is absent). */
+  /** The current resolved config, read from the live volatile reference. */
   source(): ResolvedConfig
   /** Observe committed changes to the resolved config. */
   onChange(callback: () => void): void
 }
 
 /**
- * Install the `tools-manager` settings namespace and return the bridge.
+ * Install the `tools-manager` entry's settings presentation policy and return
+ * the bridge.
  *
  * The settings service is reached through `ctx.inject(['settings'], ...)` so a
- * composition without a settings provider still loads the plugin (entry-source
- * fallback, no persistence). Multi-fiber dedupe is handled by catching the
- * `"already registered"` rejection.
+ * composition without a settings provider still loads the plugin (seed-only,
+ * no persistence). The bridge reads the config reference cordis handed to
+ * `apply`; the Loader updates that reference in place on a committed edit.
  * @param ctx - host context.
- * @param entry - composition-layer config (cordis.patch.yml seed).
+ * @param entry - the entry's volatile Cordis config.
  * @returns the bridge the gateway and policy consume.
  */
-export function installToolsManagerSettings(ctx: Context, entry: ConfigType): ToolsManagerSettingsBridge {
-  const listeners = new Set<() => void>()
-  let source = (): ResolvedConfig => resolveConfig(entry)
-  const notify = (): void => {
-    for (const listener of [...listeners]) listener()
-  }
-
+export function installToolsManagerSettings(ctx: Context, entry: EntryConfig): ToolsManagerSettingsBridge {
   ctx.inject(['settings'], (sctx) => {
-    let scope: SettingsScope<ConfigType> | undefined
-    try {
-      scope = sctx.settings.register(SETTINGS_NAMESPACE, Config, { base: entry as never })
-    } catch (error) {
-      // Multi-fiber dedupe: the first registration owns the namespace; later
-      // fibers stay on the entry source and emit no notifications of their own.
-      if (!(error instanceof Error) || !error.message.includes('already registered')) throw error
-      ctx.logger('tools-manager').debug('settings namespace already registered — entry-source fallback')
-      return
-    }
-    source = () => resolveConfig(scope!.get())
-    sctx.effect(() => () => {
-      if (isUnloading(ctx)) return
-      source = () => resolveConfig(entry)
-      notify()
-    })
-    notify()
-    scope.watch(() => {
-      if (isUnloading(ctx)) return
-      notify()
-    })
+    sctx.effect(() => sctx.settings.configure({ auto: false }, ctx.fiber))
   })
 
   return {
-    source: () => source(),
-    onChange: (cb) => { listeners.add(cb) },
+    source: () => resolveConfig({ disabled: entry.disabled?.get() }),
+    onChange: () => {},
   }
 }
