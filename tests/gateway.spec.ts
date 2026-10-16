@@ -136,7 +136,7 @@ describe('handleSet', () => {
     const bridge = bridgeOf([])
     const result = await handleSet({ toolName: 'tool_1', disabled: true }, settings as never, registry, bridge)
     expect(result.plugins).toHaveLength(1)
-    expect(result.plugins[0].tools[0].disabled).toBe(false) // bridge still returns [] until settings.update reflects
+    expect(result.plugins[0]!.tools[0]!.disabled).toBe(false) // bridge still returns [] until settings.update reflects
   })
 })
 
@@ -158,10 +158,10 @@ describe('buildView', () => {
     const bridge = bridgeOf(['tool_2'])
     const view: ToolsManagerTreeView = buildView(registry, bridge)
     expect(view.plugins).toHaveLength(2)
-    expect(view.plugins[0].name).toBe('plugin-a')
-    expect(view.plugins[0].tools[0].disabled).toBe(false)
-    expect(view.plugins[0].tools[1].disabled).toBe(true)
-    expect(view.plugins[1].tools[0].disabled).toBe(false)
+    expect(view.plugins[0]!.name).toBe('plugin-a')
+    expect(view.plugins[0]!.tools[0]!.disabled).toBe(false)
+    expect(view.plugins[0]!.tools[1]!.disabled).toBe(true)
+    expect(view.plugins[1]!.tools[0]!.disabled).toBe(false)
   })
 
   it('returns an empty plugins array when the tree is empty', () => {

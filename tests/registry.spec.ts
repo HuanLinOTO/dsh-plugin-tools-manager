@@ -77,8 +77,8 @@ describe('ToolRegistry baseline', () => {
 
     const tree = reg.getTree()
     expect(tree).toHaveLength(1)
-    expect(tree[0].name).toBe(BASELINE_GROUP)
-    expect(tree[0].tools.map(t => t.name)).toEqual(['run_python', 'run_node'])
+    expect(tree[0]!.name).toBe(BASELINE_GROUP)
+    expect(tree[0]!.tools.map(t => t.name)).toEqual(['run_python', 'run_node'])
   })
 
   it('handles an empty baseline', () => {
@@ -158,7 +158,7 @@ describe('ToolRegistry attribution on tools/change', () => {
     ])
 
     const tree = reg.getTree()
-    const tool = tree[0].tools[0]
+    const tool = tree[0]!.tools[0]!
     expect(tool.description).toBe('new desc')
     expect(tool.parameters).toEqual({ new: true })
   })
